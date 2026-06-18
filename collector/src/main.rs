@@ -25,6 +25,30 @@ struct Args {
 
     /// Symbols for which data will be collected.
     symbols: Vec<String>,
+
+    /// Subscriptions to collect. If omitted, use exchange defaults.
+    ///
+    /// For Binance:
+    /// - $symbol@trade
+    /// - $symbol@bookTicker
+    /// - $symbol@depth@0ms (futures)
+    /// - $symbol@depth@100ms (spot)
+    ///
+    /// For Bybit:
+    /// - orderbook.1.$symbol
+    /// - orderbook.50.$symbol
+    /// - orderbook.500.$symbol
+    /// - publicTrade.$symbol
+    ///
+    /// For Hyperliquid:
+    /// - trades
+    /// - l2Book
+    /// - bbo
+    ///
+    /// Example:
+    /// collector data/raw binancefuturesum BTCUSDT --subscriptions '$symbol@bookTicker'
+    #[arg(long = "subscriptions", short = 's')]
+    subscriptions: Vec<String>,
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -37,15 +61,19 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let handle = match args.exchange.as_str() {
         "binancefutures" | "binancefuturesum" => {
-            let streams = [
-                "$symbol@trade",
-                "$symbol@bookTicker",
-                "$symbol@depth@0ms",
-                // "$symbol@@markPrice@1s"
-            ]
-            .iter()
-            .map(|stream| stream.to_string())
-            .collect();
+            let streams = if args.subscriptions.is_empty() {
+                [
+                    "$symbol@trade",
+                    "$symbol@bookTicker",
+                    "$symbol@depth@0ms",
+                    // "$symbol@@markPrice@1s"
+                ]
+                .iter()
+                .map(|stream| stream.to_string())
+                .collect()
+            } else {
+                args.subscriptions.clone()
+            };
 
             tokio::spawn(binancefuturesum::run_collection(
                 streams,
@@ -54,15 +82,19 @@ async fn main() -> Result<(), anyhow::Error> {
             ))
         }
         "binancefuturescm" => {
-            let streams = [
-                "$symbol@trade",
-                "$symbol@bookTicker",
-                "$symbol@depth@0ms",
-                // "$symbol@@markPrice@1s"
-            ]
-            .iter()
-            .map(|stream| stream.to_string())
-            .collect();
+            let streams = if args.subscriptions.is_empty() {
+                [
+                    "$symbol@trade",
+                    "$symbol@bookTicker",
+                    "$symbol@depth@0ms",
+                    // "$symbol@@markPrice@1s"
+                ]
+                .iter()
+                .map(|stream| stream.to_string())
+                .collect()
+            } else {
+                args.subscriptions.clone()
+            };
 
             tokio::spawn(binancefuturescm::run_collection(
                 streams,
@@ -71,31 +103,43 @@ async fn main() -> Result<(), anyhow::Error> {
             ))
         }
         "binance" | "binancespot" => {
-            let streams = ["$symbol@trade", "$symbol@bookTicker", "$symbol@depth@100ms"]
-                .iter()
-                .map(|stream| stream.to_string())
-                .collect();
+            let streams = if args.subscriptions.is_empty() {
+                ["$symbol@trade", "$symbol@bookTicker", "$symbol@depth@100ms"]
+                    .iter()
+                    .map(|stream| stream.to_string())
+                    .collect()
+            } else {
+                args.subscriptions.clone()
+            };
 
             tokio::spawn(binance::run_collection(streams, args.symbols, writer_tx))
         }
         "bybit" => {
-            let topics = [
-                "orderbook.1.$symbol",
-                "orderbook.50.$symbol",
-                "orderbook.500.$symbol",
-                "publicTrade.$symbol",
-            ]
-            .iter()
-            .map(|topic| topic.to_string())
-            .collect();
+            let topics = if args.subscriptions.is_empty() {
+                [
+                    "orderbook.1.$symbol",
+                    "orderbook.50.$symbol",
+                    "orderbook.500.$symbol",
+                    "publicTrade.$symbol",
+                ]
+                .iter()
+                .map(|topic| topic.to_string())
+                .collect()
+            } else {
+                args.subscriptions.clone()
+            };
 
             tokio::spawn(bybit::run_collection(topics, args.symbols, writer_tx))
         }
         "hyperliquid" => {
-            let subscriptions = ["trades", "l2Book", "bbo"]
-                .iter()
-                .map(|sub| sub.to_string())
-                .collect();
+            let subscriptions = if args.subscriptions.is_empty() {
+                ["trades", "l2Book", "bbo"]
+                    .iter()
+                    .map(|sub| sub.to_string())
+                    .collect()
+            } else {
+                args.subscriptions.clone()
+            };
 
             tokio::spawn(hyperliquid::run_collection(
                 subscriptions,
